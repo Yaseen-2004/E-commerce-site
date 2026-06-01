@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>E-Commerce App</title>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f4f6f9;
+            margin: 0;
+            padding: 20px;
+        }
+
+        h2 {
+            color: #333;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: auto;
+        }
+
+        .card {
+            background: white;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        }
+
+        input {
+            width: 95%;
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 6px;
+            border: 1px solid #ccc;
+        }
+
+        button {
+            padding: 6px 10px;
+            margin-left: 5px;
+            border: none;
+            border-radius: 6px;
+            background: #007bff;
+            color: white;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #0056b3;
+        }
+
+        ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        li {
+            padding: 10px;
+            margin-bottom: 8px;
+            background: #fafafa;
+            border-radius: 6px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .price {
+            font-weight: bold;
+        }
+
+        .cart {
+            background: #fff3cd;
+        }
+
+        .actions button {
+            background: #28a745;
+        }
+
+        .remove-btn {
+            background: #dc3545;
+        }
+
+        .remove-btn:hover {
+            background: #a71d2a;
+        }
+
+        #orderSummary {
+            background: #d4edda;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="container">
+
+    <!-- LOGIN -->
+    <div class="card">
+        <h2>Login</h2>
+        <input type="email" id="email" placeholder="Email">
+        <input type="password" id="password" placeholder="Password">
+        <button onclick="login()">Login</button>
+    </div>
+
+    <!-- PRODUCTS -->
+    <div class="card">
+        <h2>Products</h2>
+        <button onclick="loadProducts()">Load Products</button>
+        <ul id="products"></ul>
+    </div>
+
+    <!-- CART -->
+    <div class="card cart">
+        <h2>Cart</h2>
+        <ul id="cart"></ul>
+        <h3 id="total">Total: ₹0</h3>
+        <button onclick="placeOrder()">Place Order</button>
+    </div>
+
+    <!-- ORDER SUMMARY -->
+    <div class="card" id="orderSummary" style="display:none;">
+        <h2>Order Summary</h2>
+        <p><strong>Customer:</strong> <span id="summaryCustomer"></span></p>
+        <ul id="summaryItems"></ul>
+        <h3 id="summaryTotal"></h3>
+    </div>
+
+</div>
+
+<script>
+
+let cart = [];
+
+// LOGIN
+function login() {
+    fetch("http://localhost:8080/api/users/login", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+            email: document.getElementById("email").value,
+            password: document.getElementById("password").value
+        })
+    })
+    .then(res => res.text())
+    .then(data => alert(data))
+    .catch(err => console.error(err));
+}
+
+
+// LOAD PRODUCTS
+function loadProducts() {
+    fetch("http://localhost:8080/api/products")
+    .then(res => res.json())
+    .then(data => {
+        let list = document.getElementById("products");
+        list.innerHTML = "";
+
+        data.forEach(p => {
+            let li = document.createElement("li");
+
+            li.innerHTML = `
+                <span>${p.name} - <span class="price">₹${p.price}</span></span>
+                <button onclick="addToCart('${p.id}', '${p.name}', ${p.price})">Add</button>
+            `;
+
+            list.appendChild(li);
+        });
+    });
+}
+
+
+// ADD TO CART
+function addToCart(productId, name, price) {
+
+    let existing = cart.find(item => item.productId === productId);
+
+    if (existing) {
+        existing.quantity++;
+    } else {
+        cart.push({
+            productId: productId,
+            name: name,
+            price: price,
+            quantity: 1
+        });
+    }
+
+    renderCart();
+}
+
+
+// RENDER CART
+function renderCart() {
+    let cartList = document.getElementById("cart");
+    cartList.innerHTML = "";
+
+    let total = 0;
+
+    cart.forEach(item => {
+
+        total += item.price * item.quantity;
+
+        let li = document.createElement("li");
+
+        li.innerHTML = `
+            <span>
+                ${item.name} - ₹${item.price} (Qty: ${item.quantity})
+            </span>
+
+            <div class="actions">
+                <button onclick="changeQty('${item.productId}', 1)">+</button>
+                <button onclick="changeQty('${item.productId}', -1)">-</button>
+                <button class="remove-btn" onclick="removeFromCart('${item.productId}')">Remove</button>
+            </div>
+        `;
+
+        cartList.appendChild(li);
+    });
+
+    document.getElementById("total").innerText = "Total: ₹" + total;
+}
+
+
+// CHANGE QUANTITY
+function changeQty(productId, change) {
+
+    let item = cart.find(i => i.productId === productId);
+
+    if (!item) return;
+
+    item.quantity += change;
+
+    if (item.quantity <= 0) {
+        removeFromCart(productId);
+        return;
+    }
+
+    renderCart();
+}
+
+
+// REMOVE ITEM
+function removeFromCart(productId) {
+    cart = cart.filter(item => item.productId !== productId);
+    renderCart();
+}
+
+
+// PLACE ORDER
+function placeOrder() {
+
+    if (cart.length === 0) {
+        alert("Cart is empty!");
+        return;
+    }
+
+    const order = {
+        customerName: "Yaseen",
+        items: cart.map(item => ({
+            productId: item.productId,
+            quantity: item.quantity
+        }))
+    };
+
+    fetch("http://localhost:8080/api/orders", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify(order)
+    })
+    .then(res => res.json())
+    .then(data => {
+
+        alert("Order placed successfully!");
+
+        showOrderSummary(data);
+
+        cart = [];
+        renderCart();
+    })
+    .catch(err => console.error(err));
+}
+
+
+// ORDER SUMMARY
+function showOrderSummary(order) {
+
+    document.getElementById("orderSummary").style.display = "block";
+
+    document.getElementById("summaryCustomer").innerText = order.customerName;
+
+    let list = document.getElementById("summaryItems");
+    list.innerHTML = "";
+
+    order.items.forEach(item => {
+
+        let li = document.createElement("li");
+
+        li.innerText = `Product ID: ${item.productId} | Quantity: ${item.quantity}`;
+
+        list.appendChild(li);
+    });
+
+    document.getElementById("summaryTotal").innerText =
+        "Total Paid: ₹" + order.totalPrice;
+}
+
+</script>
+
+</body>
+</html>
